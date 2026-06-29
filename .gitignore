@@ -46,3 +46,8 @@ output/
 *.avi
 *.mov
 *.mkv
+
+# Office temp files
+~$*.docx
+~$*.xlsx
+~$*.pptx
