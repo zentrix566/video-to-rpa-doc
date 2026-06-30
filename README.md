@@ -15,12 +15,13 @@
 video-to-rpa-doc/
 ├── scripts/
 │   ├── extract_frames.py        # 视频关键帧提取
-│   ├── gen_doc.py               # 根据配置生成 Word 文档
-│   ├── gen_flowchart.py         # 生成 Draw.io 流程图
+│   ├── gen_doc.py               # 根据配置生成 Word 文档 + 流程图
+│   ├── gen_flowchart.py         # 生成 Mermaid 流程图（HTML 离线可用）
 │   └── create_demo_video.py     # 生成测试用模拟视频
 ├── references/
 │   ├── 影刀RPA需求文档模板.docx  # 标准 Word 模板
 │   ├── yingdao_logo.jpeg        # 封面页 Logo
+│   ├── mermaid.min.js           # 流程图渲染 JS（离线使用）
 │   └── template_structure.md    # 模板结构说明
 ├── output/                      # 示例输出目录（gitignore）
 ├── README.md
@@ -31,14 +32,38 @@ video-to-rpa-doc/
 ## 环境要求
 
 - Python 3.8+
-- 依赖包：`opencv-python`、`python-docx`、`pillow`
+- 依赖包见 `requirements.txt`
 
 ## 运行方式
 
-### 1. 安装依赖
+### 1. 创建虚拟环境并安装依赖
+
+创建虚拟环境（项目根目录下）：
 
 ```bash
-pip install opencv-python python-docx pillow
+python -m venv env
+```
+
+激活虚拟环境：
+
+```bash
+# Windows (Git Bash)
+source env/Scripts/activate
+
+# Windows (CMD)
+env\Scripts\activate.bat
+
+# Windows (PowerShell)
+env\Scripts\Activate.ps1
+
+# macOS / Linux
+source env/bin/activate
+```
+
+安装依赖：
+
+```bash
+pip install -r requirements.txt
 ```
 
 ### 2. 提取视频关键帧
@@ -67,6 +92,58 @@ python scripts/extract_frames.py \
 python scripts/gen_doc.py <config.json 路径>
 ```
 
+## 常用命令
+
+创建虚拟环境：
+
+```bash
+python -m venv env
+```
+
+激活虚拟环境（Git Bash）：
+
+```bash
+source env/Scripts/activate
+```
+
+安装依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
+提取视频关键帧（命令行方式）：
+
+```bash
+python scripts/extract_frames.py \
+    <视频文件路径> \
+    <输出帧目录> \
+    -t 30 -i 1.0 -s 5
+```
+
+提取视频关键帧（配置文件方式，推荐）：
+
+```bash
+python scripts/extract_frames.py extract_config.json
+```
+
+参数说明：
+- `-t` / `--threshold`：场景变化 MSE 阈值，越大越不敏感（默认 30）
+- `-i` / `--min-interval`：相邻帧最小间隔秒数（默认 1.0）
+- `-s` / `--frame-skip`：采样跳帧数，越大提取帧越少（默认 5）
+
+生成 Word 文档：
+
+```bash
+python scripts/gen_doc.py <config.json 路径>
+```
+
+生成示例视频：
+
+```bash
+python scripts/create_demo_video.py
+```
+
 ## 生成示例视频（测试用）
 
 如果没有现成的录屏视频，可生成模拟视频测试：
@@ -75,7 +152,7 @@ python scripts/gen_doc.py <config.json 路径>
 python scripts/create_demo_video.py
 ```
 
-生成的视频包含 6 个场景（桌面、登录、表单、确认弹窗、成功提示、结束）。
+生成的视频保存到 `output/` 目录，文件名为 `demo_screen_recording_YYYYMMDD_HHMMSS.mp4`，包含 6 个场景（桌面、登录、表单、确认弹窗、成功提示、结束）。
 
 ## 作者
 

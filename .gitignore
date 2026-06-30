@@ -51,3 +51,7 @@ output/
 ~$*.docx
 ~$*.xlsx
 ~$*.pptx
+
+# Local runtime configs (contain absolute paths / 个人化路径)
+config.json
+extract_config.json

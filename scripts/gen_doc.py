@@ -444,6 +444,7 @@ if __name__ == '__main__':
     with open(sys.argv[1], 'r', encoding='utf-8') as f:
         config = json.load(f)
     generate_doc(config)
+    regenerate_flowchart(config)
     # Note: Mermaid flowchart generation has been replaced by ProcessOn.
     # Use processon-diagram-generator skill to generate the flowchart instead.
     # Keep regenerate_flowchart() as fallback for local Mermaid generation.

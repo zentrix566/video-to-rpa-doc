@@ -7,6 +7,7 @@ Usage:
     python gen_flowchart.py <config.json> [<output_dir>]
 """
 import os
+import shutil
 import sys
 import json
 import base64
@@ -47,20 +48,36 @@ def steps_to_mermaid(steps, title="业务流程图"):
     for i, step in enumerate(steps):
         node_id = f"S{i+1}"
         node_map[i] = node_id
-        
-        name = step.get('name', f'步骤{i+1}').replace('[', '【').replace(']', '】')
+
+        raw_name = step.get('name', f'步骤{i+1}')
+        # Escape characters that confuse Mermaid's flowchart parser when used as
+        # node labels. Wrapping the label in double quotes is Mermaid's officially
+        # supported way to allow special chars inside; for inner ASCII quotes we
+        # swap to Chinese full-width curly quotes (alternating open/close) so
+        # older mermaid.js builds that don't decode `#quot;` won't show the raw
+        # entity.
+        name = raw_name.replace('[', '【').replace(']', '】')
+        out_chars = []
+        is_open = True
+        for ch in name:
+            if ch in ('"', '“', '”'):
+                out_chars.append('“' if is_open else '”')
+                is_open = not is_open
+            else:
+                out_chars.append(ch)
+        name = ''.join(out_chars)
         step_type = step.get('type', 'process')
-        
+
         if step_type == 'start':
-            lines.append(f"    {node_id}([{name}]):::startEnd")
+            lines.append(f'    {node_id}(["{name}"]):::startEnd')
         elif step_type == 'end':
-            lines.append(f"    {node_id}([{name}]):::startEnd")
+            lines.append(f'    {node_id}(["{name}"]):::startEnd')
         elif step_type == 'decision':
-            lines.append(f"    {node_id}{{{name}}}:::decision")
+            lines.append(f'    {node_id}{{"{name}"}}:::decision')
         elif step_type == 'action':
-            lines.append(f"    {node_id}[{name}]:::action")
+            lines.append(f'    {node_id}["{name}"]:::action')
         else:
-            lines.append(f"    {node_id}[{name}]:::process")
+            lines.append(f'    {node_id}["{name}"]:::process')
     
     # Generate connections
     lines.append("")
@@ -94,7 +111,7 @@ def create_html_editor(mermaid_code, title="流程图编辑器"):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}}</title>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script src="mermaid.min.js"></script>
     <style>
         * {{ box-sizing: border-box; }}
         body {{
@@ -219,7 +236,7 @@ def create_html_editor(mermaid_code, title="流程图编辑器"):
             theme: 'default',
             flowchart: {{
                 useMaxWidth: true,
-                htmlLabels: true,
+                htmlLabels: false,
                 curve: 'basis'
             }}
         }});
@@ -248,34 +265,68 @@ def create_html_editor(mermaid_code, title="流程图编辑器"):
             URL.revokeObjectURL(url);
         }}
 
-        async function downloadPNG() {{
+        function downloadPNG() {{
             const svg = previewContainer.querySelector('svg');
             if (!svg) {{
                 alert('请先渲染流程图');
                 return;
             }}
-            
+
             const svgData = new XMLSerializer().serializeToString(svg);
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             const img = new Image();
-            
-            const svgBlob = new Blob([svgData], {{ type: 'image/svg+xml;charset=utf-8' }});
+
+            // Get size from viewBox for reliable dimensions
+            let width = 800, height = 600;
+            const viewBox = svg.getAttribute('viewBox');
+            if (viewBox) {{
+                const parts = viewBox.split(/\s+/).map(parseFloat);
+                if (parts.length >= 4 && parts[2] > 0 && parts[3] > 0) {{
+                    width = parts[2];
+                    height = parts[3];
+                }}
+            }}
+
+            const scale = 2;
+            canvas.width = Math.max(Math.floor(width * scale), 100);
+            canvas.height = Math.max(Math.floor(height * scale), 100);
+
+            // Ensure xmlns for standalone rendering
+            let fixedSvgData = svgData;
+            if (!fixedSvgData.includes('xmlns=')) {{
+                fixedSvgData = fixedSvgData.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+            }}
+
+            const svgBlob = new Blob([fixedSvgData], {{ type: 'image/svg+xml;charset=utf-8' }});
             const url = URL.createObjectURL(svgBlob);
-            
+
             img.onload = function() {{
-                canvas.width = img.width * 2;
-                canvas.height = img.height * 2;
-                ctx.scale(2, 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.scale(scale, scale);
                 ctx.drawImage(img, 0, 0);
                 URL.revokeObjectURL(url);
-                
-                const pngUrl = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = pngUrl;
-                a.download = 'flowchart.png';
-                a.click();
+
+                try {{
+                    const pngUrl = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = pngUrl;
+                    a.download = 'flowchart.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }} catch (e) {{
+                    console.error('Download error:', e);
+                    alert('导出失败，请尝试使用浏览器截图工具');
+                }}
             }};
+
+            img.onerror = function() {{
+                URL.revokeObjectURL(url);
+                alert('导出失败，请尝试使用浏览器截图工具');
+            }};
+
             img.src = url;
         }}
 
@@ -291,7 +342,7 @@ def create_html_editor(mermaid_code, title="流程图编辑器"):
     </script>
 </body>
 </html>'''
-    # f-string 已将 {{title}} → {title}, {{mermaid_code}} → {mermaid_code}
+    # f-string 已将 {{ 和 }} 转义为单层花括号
     return html_template.replace('{title}', title).replace('{mermaid_code}', mermaid_code)
 
 
@@ -340,7 +391,18 @@ def generate_flowchart(config, output_dir=None):
     html_content = create_html_editor(mermaid_code, title)
     with open(html_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
-    
+
+    # Copy mermaid.min.js alongside the HTML for offline use
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    src_js = os.path.join(project_root, "references", "mermaid.min.js")
+    dst_js = os.path.join(output_dir, "mermaid.min.js")
+    if os.path.exists(src_js):
+        shutil.copy2(src_js, dst_js)
+        print(f"  - Mermaid JS:     {dst_js}")
+    else:
+        print(f"  WARNING: mermaid.min.js not found at {src_js}, HTML may not render offline")
+
     print(f"Flowchart generated:")
     print(f"  - Mermaid source: {mmd_path}")
     print(f"  - HTML editor:    {html_path}")

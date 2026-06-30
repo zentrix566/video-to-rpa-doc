@@ -16,15 +16,27 @@ agent_created: true
 
 ## 前置要求
 
-执行此 skill 前，请确保 Python 环境已安装以下依赖：
-
-```bash
-pip install opencv-python python-docx pillow
-```
-
-如果当前环境没有 OpenCV，优先使用系统 Python（如 Python 3.11）或安装 `opencv-python-headless`。
+仅需 **Python 3.8+**。所有第三方依赖会由 skill 自动安装到独立虚拟环境中（见"步骤 0"），**不会污染用户全局 Python 环境**。
 
 ## 处理流程
+
+### 0. 环境准备（首次运行必做，幂等）
+
+调用 skill 自带的 setup 脚本，它会：
+- 在 `<skill_root>/env/` 创建独立虚拟环境（如果不存在）
+- 安装 `requirements.txt` 中的所有依赖
+- 输出 `VENV_PYTHON=<absolute path>` 供后续步骤使用
+
+```bash
+python <skill_root>/scripts/setup_env.py
+```
+
+**所有后续脚本调用必须使用 venv 中的 Python**：
+
+- Windows: `<skill_root>/env/Scripts/python.exe`
+- macOS / Linux: `<skill_root>/env/bin/python`
+
+为方便表述，下文统一用 `<venv_python>` 指代该路径。
 
 ### 1. 接收输入
 
@@ -33,7 +45,7 @@ pip install opencv-python python-docx pillow
 | 输入项 | 说明 | 默认值 |
 |--------|------|--------|
 | `video_path` | 输入视频文件路径 | 用户指定 |
-| `template_path` | 影刀需求模板 docx 路径 | `C:/Users/13251/.workbuddy/skills/video-to-rpa-doc/references/影刀RPA需求文档模板.docx` |
+| `template_path` | 影刀需求模板 docx 路径 | `<skill_root>/references/影刀RPA需求文档模板.docx` |
 | `output_dir` | 中间帧和最终文档输出目录 | 当前 workspace 目录 |
 | `title` | 封面标题 | 从视频内容推断 |
 | `subtitle` | 封面副标题 | 可为空 |
@@ -43,7 +55,7 @@ pip install opencv-python python-docx pillow
 使用 skill 中的脚本提取视频关键帧：
 
 ```bash
-python ~/.workbuddy/skills/video-to-rpa-doc/scripts/extract_frames.py \
+<venv_python> <skill_root>/scripts/extract_frames.py \
     <video_path> \
     <output_dir>/video_frames \
     --threshold 30 \
@@ -74,7 +86,7 @@ python ~/.workbuddy/skills/video-to-rpa-doc/scripts/extract_frames.py \
 
 ```json
 {
-    "template_path": "C:/Users/13251/.workbuddy/skills/video-to-rpa-doc/references/影刀RPA需求文档模板.docx",
+    "template_path": "<skill_root>/references/影刀RPA需求文档模板.docx",
     "output_path": "<output_dir>/需求文档.docx",
     "frames_dir": "<output_dir>/video_frames",
     "title": "iOS快捷指令：工时记录自动同步到日历",
@@ -116,7 +128,7 @@ python ~/.workbuddy/skills/video-to-rpa-doc/scripts/extract_frames.py \
 使用 skill 中的脚本生成最终文档：
 
 ```bash
-python ~/.workbuddy/skills/video-to-rpa-doc/scripts/gen_doc.py <output_dir>/config.json
+<venv_python> <skill_root>/scripts/gen_doc.py <output_dir>/config.json
 ```
 
 脚本会：
@@ -161,7 +173,7 @@ Word 文档生成后，使用 **drawio** skill 自动生成可编辑的 Draw.io 
 生成完成后：
 1. 使用 `present_files` 展示最终 Word 文档 + 流程图（.drawio 和 .png）
 2. **必须在回复中明确告知用户 Word 文档的完整绝对路径**，示例如下：
-   > 📄 需求文档已保存到：**`C:/Users/13251/WorkBuddy/2026-06-23-20-45-29/XXX-需求文档.docx`**
+   > 📄 需求文档已保存到：**`<output_dir>/XXX-需求文档.docx`**
    
    路径从 `config.json` 的 `output_path` 字段获取，严禁省略或使用相对路径。
 3. 简要说明文档结构和关键内容
@@ -172,7 +184,7 @@ Word 文档生成后，使用 **drawio** skill 自动生成可编辑的 Draw.io 
 
 标准模板位置：
 
-`C:/Users/13251/.workbuddy/skills/video-to-rpa-doc/references/影刀RPA需求文档模板.docx`
+`<skill_root>/references/影刀RPA需求文档模板.docx`
 
 模板特点：
 - 基于 `生产入库单自动写入金蝶对应字段-需求详情表` 同款样式
@@ -206,8 +218,14 @@ A: 当前脚本依赖模板已有足够的占位行。如果步骤超过10个，
 
 ## 脚本文件
 
+- `scripts/setup_env.py`: 一键创建虚拟环境并安装依赖（幂等）
 - `scripts/extract_frames.py`: 视频关键帧提取
-- `scripts/gen_doc.py`: 根据 JSON 配置生成 Word 文档
+- `scripts/gen_doc.py`: 根据 JSON 配置生成 Word 文档（自动连带生成流程图）
+- `scripts/gen_flowchart.py`: 生成 Mermaid 流程图（HTML 离线可用）
+- `scripts/create_demo_video.py`: 生成模拟测试视频
 - `references/影刀RPA需求文档模板.docx`: 标准 Word 模板
 - `references/yingdao_logo.jpeg`: 封面页影刀 RPA logo
+- `references/mermaid.min.js`: 流程图渲染 JS（离线可用）
 - `references/template_structure.md`: 模板结构说明
+- `requirements.txt`: Python 依赖清单
+- `env/`: 自动创建的虚拟环境（不进版本库）

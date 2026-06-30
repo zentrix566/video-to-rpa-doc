@@ -2,13 +2,17 @@
 """
 Extract key frames from a video using scene-change detection (OpenCV MSE).
 
-Usage:
-    python extract_frames.py <video_path> <output_dir> [--threshold 30] [--min-interval 1.0] [--frame-skip 5]
+Usage (CLI):
+    python extract_frames.py <video_path> <output_dir> [-t 30] [-i 1.0] [-s 5]
+
+Usage (Config file):
+    python extract_frames.py <extract_config.json>
 
 Outputs PNG files named like: frame_00_5s.png, frame_01_12s.png, ...
 The timestamp in the filename helps the agent select the most relevant frames.
 """
 import cv2
+import json
 import os
 import sys
 import argparse
@@ -82,13 +86,37 @@ def extract_frames(video_path, output_dir, threshold=30.0, min_interval=1.0, fra
     return saved_count
 
 
-if __name__ == '__main__':
+def _load_config():
+    """Support both CLI args and JSON config file."""
+    if len(sys.argv) < 2:
+        print("Usage:")
+        print("  python extract_frames.py <video_path> <output_dir> [-t 30] [-i 1.0] [-s 5]")
+        print("  python extract_frames.py <extract_config.json>")
+        sys.exit(1)
+
+    first_arg = sys.argv[1]
+
+    if first_arg.endswith('.json'):
+        with open(first_arg, 'r', encoding='utf-8') as f:
+            cfg = json.load(f)
+        return (
+            cfg.get('video_path'),
+            cfg.get('output_dir'),
+            cfg.get('threshold', 30.0),
+            cfg.get('min_interval', 1.0),
+            cfg.get('frame_skip', 5),
+        )
+
     parser = argparse.ArgumentParser(description='Extract key frames from video via scene detection')
     parser.add_argument('video_path', help='Path to the input video file')
     parser.add_argument('output_dir', help='Directory to save extracted frames')
-    parser.add_argument('--threshold', type=float, default=30.0, help='MSE threshold for scene change (default: 30)')
-    parser.add_argument('--min-interval', type=float, default=1.0, help='Minimum seconds between frames (default: 1.0)')
-    parser.add_argument('--frame-skip', type=int, default=5, help='Process every Nth frame (default: 5)')
+    parser.add_argument('-t', '--threshold', type=float, default=30.0, help='MSE threshold for scene change (default: 30)')
+    parser.add_argument('-i', '--min-interval', type=float, default=1.0, help='Minimum seconds between frames (default: 1.0)')
+    parser.add_argument('-s', '--frame-skip', type=int, default=5, help='Process every Nth frame (default: 5)')
     args = parser.parse_args()
+    return args.video_path, args.output_dir, args.threshold, args.min_interval, args.frame_skip
 
-    extract_frames(args.video_path, args.output_dir, args.threshold, args.min_interval, args.frame_skip)
+
+if __name__ == '__main__':
+    video_path, output_dir, threshold, min_interval, frame_skip = _load_config()
+    extract_frames(video_path, output_dir, threshold, min_interval, frame_skip)
