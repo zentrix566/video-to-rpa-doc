@@ -156,7 +156,14 @@ python scripts/create_demo_video.py
 
 ## 作者
 
-zentrix566
+- **[ruixuan-xi](https://github.com/ruixuan-xi)** — 主要作者
+- **zentrix566** — 辅助开发
+
+### 致谢
+
+特别感谢 [ruixuan-xi](https://github.com/ruixuan-xi)。
+
+视频转影刀 RPA 需求文档的思路最初由她提出，项目的核心代码也由她提供。正是这份代码让我对这个项目有了更深入的认识。我仅在此基础上做了少量的修改和完善——没有她的原始代码和思路，就不会有这个项目。
 
 ## 许可证
 
